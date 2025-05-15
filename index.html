@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Movement Timer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      margin: 0;
+      align-items: center;
+      justify-content: center;
+      background: #f5f5f5;
+    }
+    .card {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 260px;
+      width: 100%;
+    }
+    .card h1 {
+      margin: 0 0 1rem;
+      font-size: 1.5rem;
+    }
+    #count {
+      font-size: 2.5rem;
+      margin: 0.5rem 0;
+      color: #333;
+    }
+    #status {
+      color: #666;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #007bff;
+      color: #fff;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #enable-motion {
+      background: #28a745;
+    }
+    #enable-motion:hover {
+      background: #1e7e34;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Movement Timer</h1>
+    <div id="count">0 s</div>
+    <div id="status">Waiting…</div>
+    <button id="reset">Reset</button>
+    <button id="enable-motion" style="margin-left:0.5rem;">Enable Motion</button>
+  </div>
+
+  <script>
+    (function() {
+      const THRESHOLD = 0.3;       // m/s²
+      const TICK_MS   = 1000;      // update every 1 second
+
+      let count     = 0;
+      let moving    = false;
+      let timer     = null;
+
+      const $count   = document.getElementById('count');
+      const $status  = document.getElementById('status');
+      const $reset   = document.getElementById('reset');
+      const $enable  = document.getElementById('enable-motion');
+
+      // update UI
+      function updateUI() {
+        $count.textContent  = count + ' s';
+        $status.textContent = moving ? 'Moving…' : 'Stable';
+      }
+
+      // reset handler
+      $reset.addEventListener('click', () => {
+        clearInterval(timer);
+        moving = false;
+        count  = 0;
+        updateUI();
+      });
+
+      // on devices that require permission (iOS 13+)
+      $enable.addEventListener('click', async () => {
+        if (typeof DeviceMotionEvent !== 'undefined' &&
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          try {
+            const resp = await DeviceMotionEvent.requestPermission();
+            if (resp === 'granted') {
+              initMotionWatcher();
+              $enable.style.display = 'none';
+            } else {
+              alert('Motion access denied');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Error requesting motion access');
+          }
+        } else {
+          // no permission needed
+          initMotionWatcher();
+          $enable.style.display = 'none';
+        }
+      });
+
+      function initMotionWatcher() {
+        window.addEventListener('devicemotion', event => {
+          const ac = event.accelerationIncludingGravity;
+          if (!ac) return;
+
+          const { x, y, z } = ac;
+          const magnitude = Math.sqrt(x*x + y*y + z*z);
+
+          if (magnitude > THRESHOLD) {
+            if (!moving) {
+              moving = true;
+              timer = setInterval(() => {
+                count++;
+                updateUI();
+              }, TICK_MS);
+            }
+          } else {
+            if (moving) {
+              moving = false;
+              clearInterval(timer);
+              updateUI();
+            }
+          }
+        });
+
+        // initial UI
+        count = 0;
+        moving = false;
+        updateUI();
+      }
+
+      // on some desktop browsers devicemotion never fires,
+      // so hide enable-motion if unsupported
+      if (typeof DeviceMotionEvent === 'undefined') {
+        $enable.style.display = 'none';
+        $status.textContent = 'Not supported';
+      }
+    })();
+  </script>
+</body>
+</html>
